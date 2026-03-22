@@ -56,9 +56,9 @@ Pure XAML + code-behind. Code-behind contains only UI-specific logic (event wiri
 
 | Technology | Version | Purpose |
 |-----------|---------|---------|
-| .NET | 6.0+ | Runtime and SDK |
+| .NET | 10.0 (net10.0-windows) | Runtime and SDK |
 | WPF | Built-in | UI framework |
-| C# | 10+ | Language |
+| C# | 13 (via .NET 10 SDK) | Language |
 | Win32 API (user32.dll) | — | Window enumeration and manipulation |
 
 ---
