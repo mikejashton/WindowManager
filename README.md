@@ -22,23 +22,23 @@ Modern work involves running many applications at once — browsers, terminals, 
 
 | Component | Technology |
 |-----------|-----------|
-| UI Framework | C# WPF (.NET 6.0+) |
+| UI Framework | C# WPF (.NET 10.0) |
 | Pattern | MVVM (Model-View-ViewModel) |
 | Windows Integration | Win32 API via P/Invoke |
-| Language | C# 10+ |
+| Language | C# 13 (via .NET 10 SDK) |
 
 ## Getting Started
 
 ### Build Requirements
 
 - Windows 10 or Windows 11
-- [.NET 6.0 SDK](https://dotnet.microsoft.com/download/dotnet/6.0) or later
+- [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - Visual Studio 2022 (recommended) **or** the `dotnet` CLI
 
 ### Clone & Build
 
 ```bash
-git clone https://github.com/mikejashton/WindowManager.git
+git clone <your-repo-url>
 cd WindowManager
 dotnet build WindowManager.sln
 ```
