@@ -1,0 +1,11 @@
+<UserControl x:Class="WindowManager.Views.Controls.SidebarControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel Background="#2D2D30">
+        <!-- TODO: Implement sidebar with workspace tab list and new-workspace button -->
+        <TextBlock DockPanel.Dock="Top"
+                   Text="Sidebar Control"
+                   Foreground="White"
+                   Margin="10"/>
+    </DockPanel>
+</UserControl>
