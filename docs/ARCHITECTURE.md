@@ -33,7 +33,7 @@ Implement `INotifyPropertyChanged` and expose observable state consumed by the V
 | Class | Responsibility |
 |-------|---------------|
 | `MainViewModel` | Root view model. Owns the workspace collection and the currently active workspace. Exposes commands for creating workspaces and triggering window selection. |
-| `WorkspaceViewModel` | Wraps a single `Workspace` model, exposing its name and managed window for display. |
+| `WorkspaceViewModel` | Wraps a single `Workspace` model and exposes it for data binding and display in the UI. |
 
 ### Views (`src/WindowManager/Views/`)
 
