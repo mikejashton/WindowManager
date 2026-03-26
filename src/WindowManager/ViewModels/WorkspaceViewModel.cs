@@ -1,5 +1,5 @@
 using System.ComponentModel;
-using WindowManager.Models;
+using WindowManager.Abstractions.Models;
 
 namespace WindowManager.ViewModels
 {

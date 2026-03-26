@@ -1,6 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using WindowManager.Models;
+using WindowManager.Abstractions.Models;
 using WindowManager.Services;
 
 namespace WindowManager.ViewModels

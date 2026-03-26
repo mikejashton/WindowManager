@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
-using WindowManager.Models;
+using WindowManager.Abstractions.Models;
+using WindowManager.Abstractions.Services;
 
 namespace WindowManager.Services
 {
@@ -9,7 +10,7 @@ namespace WindowManager.Services
     /// </summary>
     public class WorkspaceManager
     {
-        private readonly WindowService _windowService;
+        private readonly IWindowService _windowService;
 
         /// <summary>Gets the collection of workspaces; changes are reflected in the UI via data binding.</summary>
         public ObservableCollection<Workspace> Workspaces { get; }
@@ -17,8 +18,8 @@ namespace WindowManager.Services
         /// <summary>
         /// Initialises a new instance of <see cref="WorkspaceManager"/>.
         /// </summary>
-        /// <param name="windowService">The window service used to show/hide managed windows.</param>
-        public WorkspaceManager(WindowService windowService)
+        /// <param name="windowService">The platform window service used to show/hide managed windows.</param>
+        public WorkspaceManager(IWindowService windowService)
         {
             _windowService = windowService;
             Workspaces = new ObservableCollection<Workspace>();
@@ -27,7 +28,6 @@ namespace WindowManager.Services
         /// <summary>
         /// Creates a new workspace with the given name and adds it to the collection.
         /// </summary>
-        /// <param name="name">The user-defined name for the workspace.</param>
         // TODO: Implement workspace creation (create Workspace, add to Workspaces)
         public void CreateWorkspace(string name)
         {
@@ -38,7 +38,6 @@ namespace WindowManager.Services
         /// Switches the active workspace: hides the window of the current workspace (if any)
         /// and shows the window of the target workspace (if any).
         /// </summary>
-        /// <param name="workspace">The workspace to make active.</param>
         // TODO: Implement show/hide transitions via _windowService
         public void SwitchToWorkspace(Workspace workspace)
         {

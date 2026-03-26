@@ -1,4 +1,4 @@
-namespace WindowManager.Models
+namespace WindowManager.Abstractions.Models
 {
     /// <summary>
     /// Represents a named workspace tab that holds a managed window.
