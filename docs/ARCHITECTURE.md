@@ -93,7 +93,7 @@ Key Win32 APIs used:
 User action (click tab)
         │
         ▼
-MainViewModel.SwitchWorkspace(workspace)
+MainViewModel updates active workspace (e.g., via command/property)
         │
         ├─► WorkspaceManager.SwitchToWorkspace(workspace)
         │           │
