@@ -9,10 +9,7 @@ namespace WindowManager.Helpers
     /// </summary>
     public static class NativeMethods
     {
-        // TODO: Add remaining Win32 API declarations as needed:
-        //   EnumWindows, GetWindowText, GetWindowTextLength, IsWindowVisible,
-        //   GetWindowThreadProcessId, ShowWindow, SetWindowPos, SetForegroundWindow,
-        //   GetSystemMetrics, SystemParametersInfo, etc.
+        // TODO: Add additional Win32 API declarations here as needed.
 
         /// <summary>Delegate used as the callback for <see cref="EnumWindows"/>.</summary>
         public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
