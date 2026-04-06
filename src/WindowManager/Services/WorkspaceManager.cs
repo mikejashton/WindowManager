@@ -1,3 +1,4 @@
+using System;
 using System.Collections.ObjectModel;
 using WindowManager.Abstractions.Models;
 using WindowManager.Abstractions.Services;
@@ -11,6 +12,7 @@ namespace WindowManager.Services
     public class WorkspaceManager
     {
         private readonly IWindowService _windowService;
+        private Workspace? _activeWorkspace;
 
         /// <summary>Gets the collection of workspaces; changes are reflected in the UI via data binding.</summary>
         public ObservableCollection<Workspace> Workspaces { get; }
@@ -28,20 +30,60 @@ namespace WindowManager.Services
         /// <summary>
         /// Creates a new workspace with the given name and adds it to the collection.
         /// </summary>
-        // TODO: Implement workspace creation (create Workspace, add to Workspaces)
-        public void CreateWorkspace(string name)
+        public Workspace CreateWorkspace(string name)
         {
-            throw new System.NotImplementedException();
+            var trimmedName = (name ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(trimmedName))
+            {
+                trimmedName = $"Workspace {Workspaces.Count + 1}";
+            }
+
+            var workspace = new Workspace
+            {
+                Name = trimmedName
+            };
+
+            Workspaces.Add(workspace);
+            return workspace;
         }
 
         /// <summary>
         /// Switches the active workspace: hides the window of the current workspace (if any)
         /// and shows the window of the target workspace (if any).
         /// </summary>
-        // TODO: Implement show/hide transitions via _windowService
         public void SwitchToWorkspace(Workspace workspace)
         {
-            throw new System.NotImplementedException();
+            if (_activeWorkspace == workspace)
+            {
+                return;
+            }
+
+            if (_activeWorkspace?.Window is { } previousWindow)
+            {
+                if (_windowService.IsWindowValid(previousWindow))
+                {
+                    _windowService.HideWindow(previousWindow);
+                }
+                else
+                {
+                    _activeWorkspace.Window = null;
+                }
+            }
+
+            if (workspace.Window is { } nextWindow)
+            {
+                if (_windowService.IsWindowValid(nextWindow))
+                {
+                    _windowService.ShowWindow(nextWindow);
+                    _windowService.PositionWindowFullScreen(nextWindow);
+                }
+                else
+                {
+                    workspace.Window = null;
+                }
+            }
+
+            _activeWorkspace = workspace;
         }
     }
 }

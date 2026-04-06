@@ -13,13 +13,60 @@
         <!-- Left Sidebar -->
         <controls:SidebarControl Grid.Column="0"/>
 
-        <!-- Main Content Area Placeholder -->
-        <Border Grid.Column="1" BackgroundColor="#1E1E1E">
-            <Label Text="Select a window to manage"
-                   HorizontalOptions="Center"
-                   VerticalOptions="Center"
-                   TextColor="#888888"
-                   FontSize="18"/>
+        <!-- Right pane: visible top-level windows -->
+        <Border Grid.Column="1" BackgroundColor="#1E1E1E" Padding="12">
+            <Grid>
+                <Grid IsVisible="{Binding ShouldShowWindowList}" RowDefinitions="Auto,*">
+                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+                        <Label Grid.Column="0"
+                               Text="Select a Window"
+                               TextColor="White"
+                               FontSize="18"
+                               FontAttributes="Bold"
+                               VerticalOptions="Center"/>
+                        <Button Grid.Column="1"
+                                Text="Refresh"
+                                Clicked="OnRefreshWindowsClicked"/>
+                    </Grid>
+
+                    <CollectionView Grid.Row="1"
+                                    ItemsSource="{Binding TopLevelWindows}"
+                                    SelectionMode="Single"
+                                    SelectedItem="{Binding SelectedTopLevelWindow, Mode=TwoWay}">
+                        <CollectionView.EmptyView>
+                            <Label Text="No top-level windows found"
+                                   TextColor="#888888"
+                                   HorizontalOptions="Center"
+                                   VerticalOptions="Center"/>
+                        </CollectionView.EmptyView>
+
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,0,8" Padding="10" Stroke="#3A3A3A" StrokeThickness="1">
+                                    <VerticalStackLayout Spacing="3">
+                                        <Label Text="{Binding Title}" TextColor="White" FontAttributes="Bold" LineBreakMode="TailTruncation"/>
+                                        <Label Text="{Binding ProcessName}" TextColor="#B0B0B0" FontSize="12"/>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </Grid>
+
+                <VerticalStackLayout IsVisible="{Binding ShowWindowListPlaceholder}"
+                                     HorizontalOptions="Center"
+                                     VerticalOptions="Center"
+                                     Spacing="8">
+                    <Label Text="Workspace"
+                           TextColor="White"
+                           FontSize="18"
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center"/>
+                    <Label Text="{Binding WindowListPlaceholderText}"
+                           TextColor="#A0A0A0"
+                           HorizontalTextAlignment="Center"/>
+                </VerticalStackLayout>
+            </Grid>
         </Border>
     </Grid>
 </ContentPage>

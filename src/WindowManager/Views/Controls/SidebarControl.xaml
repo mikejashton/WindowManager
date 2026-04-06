@@ -1,6 +1,7 @@
 <ContentView x:Class="WindowManager.Views.Controls.SidebarControl"
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:WindowManager.Abstractions.Models;assembly=WindowManager.Abstractions">
     <Border BackgroundColor="#2D2D30" Padding="10">
         <Grid RowDefinitions="Auto,*,Auto">
             <Label Grid.Row="0"
@@ -9,14 +10,32 @@
                    FontSize="16"
                    FontAttributes="Bold"
                    Margin="0,0,0,10"/>
-            <!-- TODO: Add workspace list (CollectionView) here -->
-            <ScrollView Grid.Row="1" VerticalScrollBarVisibility="Always">
-                <VerticalStackLayout/>
-            </ScrollView>
+            <CollectionView Grid.Row="1"
+                            ItemsSource="{Binding Workspaces}"
+                            SelectionMode="Single"
+                            SelectedItem="{Binding ActiveWorkspace, Mode=TwoWay}">
+                <CollectionView.EmptyView>
+                    <Label Text="No workspaces yet"
+                           TextColor="#A0A0A0"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"/>
+                </CollectionView.EmptyView>
+
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:Workspace">
+                        <Border Margin="0,0,0,8" Padding="8" Stroke="#3A3A3A" StrokeThickness="1">
+                            <Label Text="{Binding Name}"
+                                   TextColor="White"
+                                   LineBreakMode="TailTruncation"/>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
             <Button Grid.Row="2"
                     Text="+ New Workspace"
                     Padding="5"
-                    Margin="0,5,0,0"/>
+                    Margin="0,5,0,0"
+                    Command="{Binding CreateWorkspaceCommand}"/>
         </Grid>
     </Border>
 </ContentView>
