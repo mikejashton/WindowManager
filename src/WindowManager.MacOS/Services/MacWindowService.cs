@@ -584,7 +584,7 @@ namespace WindowManager.MacOS.Services
                 CGRect screenBounds,
                 CGWindowListOption listOption,
                 uint windowID,
-                int imageOption); // CGWindowImageOption: 0 = default, 1 = bounds ignore framing
+                int imageOption); // see kCGWindowImageDefault / kCGWindowImageBoundsIgnoreFraming constants below
 
             // Accessibility ───────────────────────────────────────────────────
 

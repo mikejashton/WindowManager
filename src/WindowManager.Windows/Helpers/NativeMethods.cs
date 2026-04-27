@@ -84,12 +84,12 @@ namespace WindowManager.Windows.Helpers
         // ── GDI ──────────────────────────────────────────────────────────────
 
         /// <summary>Retrieves a handle to a device context (DC) for the specified window or, when NULL, the entire screen.</summary>
-        [DllImport("gdi32.dll")]
-        public static extern IntPtr CreateCompatibleDC(IntPtr hdc);
-
-        /// <summary>Creates a memory device context (DC) compatible with the specified device.</summary>
         [DllImport("user32.dll")]
         public static extern IntPtr GetDC(IntPtr hWnd);
+
+        /// <summary>Creates a memory device context (DC) compatible with the device associated with the specified DC.</summary>
+        [DllImport("gdi32.dll")]
+        public static extern IntPtr CreateCompatibleDC(IntPtr hdc);
 
         /// <summary>Releases a DC obtained via <see cref="GetDC"/>.</summary>
         [DllImport("user32.dll")]

@@ -268,9 +268,9 @@ namespace WindowManager.ViewModels
                     }
 
                     // Capture loop variable for the lambda closure.
-                    var captured   = screenshot;
-                    var targetWin  = window;
-                    MainThread.BeginInvokeOnMainThread(() => targetWin.Screenshot = captured);
+                    var capturedScreenshot = screenshot;
+                    var targetWindow       = window;
+                    MainThread.BeginInvokeOnMainThread(() => targetWindow.Screenshot = capturedScreenshot);
                 }
             });
         }
