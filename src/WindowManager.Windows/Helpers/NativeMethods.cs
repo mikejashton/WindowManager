@@ -60,13 +60,18 @@ namespace WindowManager.Windows.Helpers
         [DllImport("user32.dll", SetLastError = true)]
         public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
+        /// <summary>Retrieves the DPI for the specified window.</summary>
+        [DllImport("user32.dll")]
+        public static extern uint GetDpiForWindow(IntPtr hWnd);
+
         // ShowWindow nCmdShow constants
-        public const int SW_HIDE = 0;
-        public const int SW_SHOW = 5;
+        public const int SW_HIDE    = 0;
+        public const int SW_RESTORE = 9;
+        public const int SW_SHOW    = 5;
 
         // SetWindowPos flags
-        public const uint SWP_NOZORDER = 0x0004;
-        public const uint SWP_NOACTIVATE = 0x0010;
-        public const uint SWP_SHOWWINDOW = 0x0040;
+        public const uint SWP_NOZORDER    = 0x0004;
+        public const uint SWP_NOACTIVATE  = 0x0010;
+        public const uint SWP_SHOWWINDOW  = 0x0040;
     }
 }

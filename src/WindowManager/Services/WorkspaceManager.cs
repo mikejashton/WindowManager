@@ -49,25 +49,26 @@ namespace WindowManager.Services
 
         /// <summary>
         /// Switches the active workspace: hides the window of the current workspace (if any)
-        /// and shows the window of the target workspace (if any).
+        /// and shows + repositions the window of the target workspace (if any).
         /// </summary>
-        public void SwitchToWorkspace(Workspace workspace)
+        /// <param name="workspace">The workspace to make active.</param>
+        /// <param name="contentX">Left edge of the content area in screen coordinates.</param>
+        /// <param name="contentY">Top edge of the content area in screen coordinates.</param>
+        /// <param name="contentWidth">Width of the content area.</param>
+        /// <param name="contentHeight">Height of the content area.</param>
+        public void SwitchToWorkspace(
+            Workspace workspace,
+            double contentX, double contentY,
+            double contentWidth, double contentHeight)
         {
-            if (_activeWorkspace == workspace)
-            {
-                return;
-            }
+            if (_activeWorkspace == workspace) return;
 
             if (_activeWorkspace?.Window is { } previousWindow)
             {
                 if (_windowService.IsWindowValid(previousWindow))
-                {
                     _windowService.HideWindow(previousWindow);
-                }
                 else
-                {
                     _activeWorkspace.Window = null;
-                }
             }
 
             if (workspace.Window is { } nextWindow)
@@ -75,7 +76,7 @@ namespace WindowManager.Services
                 if (_windowService.IsWindowValid(nextWindow))
                 {
                     _windowService.ShowWindow(nextWindow);
-                    _windowService.PositionWindowFullScreen(nextWindow);
+                    _windowService.PositionWindow(nextWindow, contentX, contentY, contentWidth, contentHeight);
                 }
                 else
                 {

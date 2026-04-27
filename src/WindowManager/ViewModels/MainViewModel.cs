@@ -21,6 +21,12 @@ namespace WindowManager.ViewModels
         private Workspace? _activeWorkspace;
         private ManagedWindow? _selectedTopLevelWindow;
 
+        // Screen-space coords of the right-hand content pane, updated by MainWindow.
+        private double _contentX;
+        private double _contentY;
+        private double _contentWidth;
+        private double _contentHeight;
+
         /// <inheritdoc />
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -43,7 +49,7 @@ namespace WindowManager.ViewModels
 
                 if (value != null)
                 {
-                    _workspaceManager.SwitchToWorkspace(value);
+                    _workspaceManager.SwitchToWorkspace(value, _contentX, _contentY, _contentWidth, _contentHeight);
                 }
 
                 _activeWorkspace = value;
@@ -113,6 +119,24 @@ namespace WindowManager.ViewModels
         }
 
         /// <summary>
+        /// Forwards the platform permission request to the window service.
+        /// Must be called once at startup so any required OS dialogs surface immediately.
+        /// </summary>
+        public void CheckPermissions() => _windowService.CheckPermissions();
+
+        /// <summary>
+        /// Updates the screen-space rectangle of the right-hand content pane.
+        /// Call this from <c>MainWindow</c> whenever the window is first shown or resized.
+        /// </summary>
+        public void UpdateContentArea(double x, double y, double width, double height)
+        {
+            _contentX = x;
+            _contentY = y;
+            _contentWidth = width;
+            _contentHeight = height;
+        }
+
+        /// <summary>
         /// Creates a workspace and makes it active.
         /// </summary>
         public void CreateWorkspace()
@@ -133,7 +157,7 @@ namespace WindowManager.ViewModels
 
             ActiveWorkspace.Window = window;
             _windowService.ShowWindow(window);
-            _windowService.PositionWindowFullScreen(window);
+            _windowService.PositionWindow(window, _contentX, _contentY, _contentWidth, _contentHeight);
 
             TopLevelWindows.Clear();
             _selectedTopLevelWindow = null;

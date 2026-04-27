@@ -18,12 +18,24 @@ namespace WindowManager.Abstractions.Services
         void HideWindow(ManagedWindow window);
 
         /// <summary>
-        /// Repositions and resizes the specified window to fill the primary screen's working area,
-        /// offset so it does not overlap the application's own sidebar.
+        /// Repositions and resizes the specified window to fill the given screen-space rectangle.
+        /// Coordinates use a top-left origin in logical (device-independent) screen points.
         /// </summary>
-        void PositionWindowFullScreen(ManagedWindow window);
+        /// <param name="window">The window to move and resize.</param>
+        /// <param name="x">Left edge of the target area in screen coordinates.</param>
+        /// <param name="y">Top edge of the target area in screen coordinates.</param>
+        /// <param name="width">Width of the target area.</param>
+        /// <param name="height">Height of the target area.</param>
+        void PositionWindow(ManagedWindow window, double x, double y, double width, double height);
 
         /// <summary>Returns true if the window handle still refers to a live window.</summary>
         bool IsWindowValid(ManagedWindow window);
+
+        /// <summary>
+        /// Checks whether the required OS permissions are in place and, on the first call
+        /// when they are not, triggers the platform permission request flow.
+        /// Should be called once at application startup.
+        /// </summary>
+        void CheckPermissions();
     }
 }
