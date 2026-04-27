@@ -37,5 +37,13 @@ namespace WindowManager.Abstractions.Services
         /// Should be called once at application startup.
         /// </summary>
         void CheckPermissions();
+
+        /// <summary>
+        /// Captures a thumbnail screenshot of the specified window.
+        /// Returns the image as a byte array (BMP on Windows, JPEG on macOS),
+        /// or <c>null</c> if the capture fails (e.g. window is hidden, invalid handle,
+        /// or required OS permissions have not been granted).
+        /// </summary>
+        byte[]? CaptureScreenshot(ManagedWindow window);
     }
 }

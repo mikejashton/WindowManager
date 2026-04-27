@@ -63,12 +63,21 @@ namespace WindowManager.MacOS.Services
         /// the first time per session that the process is not trusted, opening the System Settings
         /// Accessibility dialog so the user can grant access before trying any operation.
         ///
+        /// Also requests the Screen Recording permission required by <c>CGWindowListCreateImage</c>
+        /// (available since macOS 10.15). If not yet granted the system consent dialog is shown.
+        ///
         /// <b>Development note</b>: macOS ties the Accessibility permission entry to the binary's
         /// code-signing hash. Every debug rebuild produces a new hash, making the previously
         /// granted entry stale. After each rebuild you must open System Settings →
         /// Privacy &amp; Security → Accessibility, remove the old entry, and enable the new one.
         /// </remarks>
         public void CheckPermissions()
+        {
+            CheckAccessibilityPermission();
+            CheckScreenCapturePermission();
+        }
+
+        private void CheckAccessibilityPermission()
         {
             if (NativeMethods.AXIsProcessTrusted())
             {
@@ -89,6 +98,21 @@ namespace WindowManager.MacOS.Services
             using var value = NSNumber.FromBoolean(true);
             using var opts  = NSDictionary.FromObjectAndKey(value, key);
             NativeMethods.AXIsProcessTrustedWithOptions(opts.Handle);
+        }
+
+        private void CheckScreenCapturePermission()
+        {
+            if (NativeMethods.CGPreflightScreenCaptureAccess())
+            {
+                Debug.WriteLine("[MacWindowService] Screen Recording permission: GRANTED ✓");
+                return;
+            }
+
+            Debug.WriteLine(
+                "[MacWindowService] Screen Recording permission: NOT GRANTED. " +
+                "Requesting access — enable the app in System Settings → " +
+                "Privacy & Security → Screen Recording.");
+            NativeMethods.CGRequestScreenCaptureAccess();
         }
 
         /// <summary>Returns <c>true</c> if the process currently has Accessibility permission.</summary>
@@ -297,6 +321,46 @@ namespace WindowManager.MacOS.Services
             }
         }
 
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Uses <c>CGWindowListCreateImage</c> with <c>kCGWindowListOptionIncludingWindow</c>
+        /// to capture a composited snapshot of the specified window. The result is encoded as
+        /// JPEG (quality 0.7) using the ImageIO framework and returned as a byte array.
+        ///
+        /// <b>Permission note</b>: macOS 10.15+ requires the Screen Recording permission.
+        /// <see cref="CheckPermissions"/> requests this at startup; if not yet granted
+        /// <c>CGWindowListCreateImage</c> will return a transparent/black image and this method
+        /// returns <c>null</c>.
+        /// </remarks>
+        public byte[]? CaptureScreenshot(ManagedWindow window)
+        {
+            if (window.Handle == IntPtr.Zero) return null;
+
+            // CGWindowID is a uint; the handle was stored as IntPtr(windowNumber).
+            var windowID = (uint)window.Handle.ToInt32();
+
+            var cgImage = NativeMethods.CGWindowListCreateImage(
+                NativeMethods.CGRect.Infinite,
+                NativeMethods.CGWindowListOption.IncludingWindow,
+                windowID,
+                NativeMethods.kCGWindowImageBoundsIgnoreFraming);
+
+            if (cgImage == IntPtr.Zero)
+            {
+                Debug.WriteLine($"[MacWindowService] CaptureScreenshot: CGWindowListCreateImage returned null for window {windowID}");
+                return null;
+            }
+
+            try
+            {
+                return EncodeImageAsJpeg(cgImage);
+            }
+            finally
+            {
+                NativeMethods.CFRelease(cgImage);
+            }
+        }
+
         // ── Private helpers ──────────────────────────────────────────────────
 
         /// <summary>
@@ -450,6 +514,47 @@ namespace WindowManager.MacOS.Services
             return true;
         }
 
+        /// <summary>
+        /// Encodes a <c>CGImageRef</c> as a JPEG byte array (quality 0.7) using the ImageIO
+        /// framework. Returns <c>null</c> if the encoding fails.
+        /// </summary>
+        private static byte[]? EncodeImageAsJpeg(IntPtr cgImage)
+        {
+            var cfData = NativeMethods.CFDataCreateMutable(IntPtr.Zero, 0);
+            if (cfData == IntPtr.Zero) return null;
+
+            try
+            {
+                using var uti  = new NSString("public.jpeg");
+                var dest = NativeMethods.CGImageDestinationCreateWithData(
+                    cfData, uti.Handle, 1, IntPtr.Zero);
+
+                if (dest == IntPtr.Zero) return null;
+
+                try
+                {
+                    NativeMethods.CGImageDestinationAddImage(dest, cgImage, IntPtr.Zero);
+                    if (!NativeMethods.CGImageDestinationFinalize(dest)) return null;
+
+                    int    length = (int)NativeMethods.CFDataGetLength(cfData);
+                    IntPtr ptr    = NativeMethods.CFDataGetBytePtr(cfData);
+                    if (length <= 0 || ptr == IntPtr.Zero) return null;
+
+                    var result = new byte[length];
+                    Marshal.Copy(ptr, result, 0, length);
+                    return result;
+                }
+                finally
+                {
+                    NativeMethods.CFRelease(dest);
+                }
+            }
+            finally
+            {
+                NativeMethods.CFRelease(cfData);
+            }
+        }
+
         // ── P/Invoke declarations ────────────────────────────────────────────
 
         private static class NativeMethods
@@ -460,12 +565,26 @@ namespace WindowManager.MacOS.Services
             internal enum CGWindowListOption : uint
             {
                 OnScreenOnly           = 1u,
+                IncludingWindow        = 8u,
                 ExcludeDesktopElements = 16u
             }
 
             [DllImport("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")]
             internal static extern IntPtr CGWindowListCopyWindowInfo(
                 CGWindowListOption option, IntPtr relativeToWindow);
+
+            /// <summary>
+            /// Captures a composited image of the specified windows.
+            /// Pass <see cref="CGRect.Infinite"/> to let the system use each window's own bounds.
+            /// Pass <see cref="CGWindowListOption.IncludingWindow"/> with a specific window ID to
+            /// capture that single window.
+            /// </summary>
+            [DllImport("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")]
+            internal static extern IntPtr CGWindowListCreateImage(
+                CGRect screenBounds,
+                CGWindowListOption listOption,
+                uint windowID,
+                int imageOption); // CGWindowImageOption: 0 = default, 1 = bounds ignore framing
 
             // Accessibility ───────────────────────────────────────────────────
 
@@ -501,6 +620,47 @@ namespace WindowManager.MacOS.Services
             [return: MarshalAs(UnmanagedType.Bool)]
             internal static extern bool AXIsProcessTrustedWithOptions(IntPtr options);
 
+            // Screen-capture permission (macOS 10.15+) ────────────────────────
+
+            /// <summary>
+            /// Returns whether the current process already has Screen Recording permission.
+            /// Does NOT show a system dialog.
+            /// </summary>
+            [DllImport("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            internal static extern bool CGPreflightScreenCaptureAccess();
+
+            /// <summary>
+            /// Requests Screen Recording permission. On first call this triggers the system
+            /// consent dialog; subsequent calls while the request is pending are no-ops.
+            /// Returns <c>true</c> if access is already granted.
+            /// </summary>
+            [DllImport("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            internal static extern bool CGRequestScreenCaptureAccess();
+
+            // ImageIO ─────────────────────────────────────────────────────────
+
+            /// <summary>Creates an image destination that writes to a mutable CF data buffer.</summary>
+            [DllImport("/System/Library/Frameworks/ImageIO.framework/ImageIO")]
+            internal static extern IntPtr CGImageDestinationCreateWithData(
+                IntPtr data,        // CFMutableDataRef
+                IntPtr type,        // CFStringRef UTI  (e.g. "public.jpeg")
+                nint   count,       // number of images (1)
+                IntPtr options);    // CFDictionaryRef, pass IntPtr.Zero
+
+            /// <summary>Appends a CGImage to an image destination.</summary>
+            [DllImport("/System/Library/Frameworks/ImageIO.framework/ImageIO")]
+            internal static extern void CGImageDestinationAddImage(
+                IntPtr dest,        // CGImageDestinationRef
+                IntPtr image,       // CGImageRef
+                IntPtr properties); // CFDictionaryRef, pass IntPtr.Zero
+
+            /// <summary>Finalises the image destination and writes the encoded bytes to the data buffer.</summary>
+            [DllImport("/System/Library/Frameworks/ImageIO.framework/ImageIO")]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            internal static extern bool CGImageDestinationFinalize(IntPtr dest);
+
             // CoreFoundation ──────────────────────────────────────────────────
 
             [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
@@ -512,9 +672,25 @@ namespace WindowManager.MacOS.Services
             [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
             internal static extern IntPtr CFArrayGetValueAtIndex(IntPtr theArray, nint idx);
 
+            /// <summary>Creates a new mutable CF data object with the given initial capacity.</summary>
+            [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
+            internal static extern IntPtr CFDataCreateMutable(IntPtr allocator, nint capacity);
+
+            /// <summary>Returns the number of bytes in a CF data object.</summary>
+            [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
+            internal static extern nint CFDataGetLength(IntPtr theData);
+
+            /// <summary>Returns a read-only pointer to the bytes of a CF data object.</summary>
+            [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
+            internal static extern IntPtr CFDataGetBytePtr(IntPtr theData);
+
             // AX value type constants ─────────────────────────────────────────
             internal const int kAXValueCGPointType = 1;
             internal const int kAXValueCGSizeType  = 2;
+
+            // CGWindowImageOption constants
+            internal const int kCGWindowImageDefault            = 0;
+            internal const int kCGWindowImageBoundsIgnoreFraming = 1;
 
             // Structs ─────────────────────────────────────────────────────────
 
@@ -523,6 +699,27 @@ namespace WindowManager.MacOS.Services
 
             [StructLayout(LayoutKind.Sequential)]
             internal struct CGSize { public double Width; public double Height; }
+
+            [StructLayout(LayoutKind.Sequential)]
+            internal struct CGRect
+            {
+                public double X;
+                public double Y;
+                public double Width;
+                public double Height;
+
+                /// <summary>
+                /// Equivalent to CoreGraphics <c>CGRectInfinite</c>: a rect large enough to
+                /// encompass every window when passed to <c>CGWindowListCreateImage</c>.
+                /// </summary>
+                internal static CGRect Infinite => new CGRect
+                {
+                    X      = -double.MaxValue / 2,
+                    Y      = -double.MaxValue / 2,
+                    Width  = double.MaxValue,
+                    Height = double.MaxValue
+                };
+            }
         }
     }
 }

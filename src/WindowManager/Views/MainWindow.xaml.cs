@@ -6,7 +6,8 @@ namespace WindowManager.Views
 {
     public partial class MainWindow : ContentPage
     {
-        private static readonly System.TimeSpan AutoRefreshInterval = System.TimeSpan.FromSeconds(2);
+        private static readonly System.TimeSpan AutoRefreshInterval    = System.TimeSpan.FromSeconds(2);
+        private static readonly System.TimeSpan ScreenshotRefreshInterval = System.TimeSpan.FromSeconds(3);
 
         /// <summary>
         /// Width of the left sidebar in device-independent points.
@@ -16,6 +17,7 @@ namespace WindowManager.Views
 
         private readonly MainViewModel _viewModel;
         private IDispatcherTimer? _pollingTimer;
+        private IDispatcherTimer? _screenshotTimer;
 
         public MainWindow(MainViewModel viewModel)
         {
@@ -148,22 +150,47 @@ namespace WindowManager.Views
 
         private void StartAutoPolling()
         {
-            if (_pollingTimer != null) return;
-            _pollingTimer = Dispatcher.CreateTimer();
-            _pollingTimer.Interval = AutoRefreshInterval;
-            _pollingTimer.Tick += OnPollingTimerTick;
-            _pollingTimer.Start();
+            if (_pollingTimer == null)
+            {
+                _pollingTimer = Dispatcher.CreateTimer();
+                _pollingTimer.Interval = AutoRefreshInterval;
+                _pollingTimer.Tick += OnPollingTimerTick;
+                _pollingTimer.Start();
+            }
+
+            if (_screenshotTimer == null)
+            {
+                _screenshotTimer = Dispatcher.CreateTimer();
+                _screenshotTimer.Interval = ScreenshotRefreshInterval;
+                _screenshotTimer.Tick += OnScreenshotTimerTick;
+                _screenshotTimer.Start();
+            }
         }
 
         private void StopAutoPolling()
         {
-            if (_pollingTimer == null) return;
-            _pollingTimer.Stop();
-            _pollingTimer.Tick -= OnPollingTimerTick;
-            _pollingTimer = null;
+            if (_pollingTimer != null)
+            {
+                _pollingTimer.Stop();
+                _pollingTimer.Tick -= OnPollingTimerTick;
+                _pollingTimer = null;
+            }
+
+            if (_screenshotTimer != null)
+            {
+                _screenshotTimer.Stop();
+                _screenshotTimer.Tick -= OnScreenshotTimerTick;
+                _screenshotTimer = null;
+            }
         }
 
         private void OnPollingTimerTick(object? sender, System.EventArgs e) => RefreshWindows();
+
+        private void OnScreenshotTimerTick(object? sender, System.EventArgs e)
+        {
+            // Fire-and-forget: screenshot capture runs on a background thread.
+            _ = _viewModel.UpdateScreenshotsAsync();
+        }
 
         private void RefreshWindows() => _viewModel.RefreshTopLevelWindows();
     }

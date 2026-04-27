@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Threading.Tasks;
 using System.Windows.Input;
 using Microsoft.Maui.Controls;
+using Microsoft.Maui.Dispatching;
 using WindowManager.Abstractions.Models;
 using WindowManager.Abstractions.Services;
 using WindowManager.Services;
@@ -216,6 +218,9 @@ namespace WindowManager.ViewModels
                 if (!string.Equals(current.Title, latest.Title, StringComparison.Ordinal) ||
                     !string.Equals(current.ProcessName, latest.ProcessName, StringComparison.Ordinal))
                 {
+                    // Preserve any cached screenshot on the replacement item so the thumbnail
+                    // remains visible while the next screenshot refresh cycle runs.
+                    latest.Screenshot = current.Screenshot;
                     TopLevelWindows[i] = latest;
                 }
 
@@ -230,6 +235,44 @@ namespace WindowManager.ViewModels
                     TopLevelWindows.Add(window);
                 }
             }
+        }
+
+        /// <summary>
+        /// Asynchronously captures a fresh screenshot for every window currently shown in the
+        /// top-level window list and updates each <see cref="ManagedWindow.Screenshot"/> property.
+        /// Screenshot capture runs on a background thread; the property update is marshalled back
+        /// to the UI thread via <see cref="MainThread"/> so that data-bound controls refresh.
+        /// </summary>
+        public async Task UpdateScreenshotsAsync()
+        {
+            if (!ShouldShowWindowList) return;
+
+            // Snapshot the current list so we don't iterate a live collection from a background thread.
+            var windows = new List<ManagedWindow>(TopLevelWindows);
+            if (windows.Count == 0) return;
+
+            await Task.Run(() =>
+            {
+                foreach (var window in windows)
+                {
+                    byte[]? screenshot;
+                    try
+                    {
+                        screenshot = _windowService.CaptureScreenshot(window);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            $"[MainViewModel] CaptureScreenshot failed for '{window.Title}': {ex.Message}");
+                        screenshot = null;
+                    }
+
+                    // Capture loop variable for the lambda closure.
+                    var captured   = screenshot;
+                    var targetWin  = window;
+                    MainThread.BeginInvokeOnMainThread(() => targetWin.Screenshot = captured);
+                }
+            });
         }
 
         /// <summary>Raises the <see cref="PropertyChanged"/> event.</summary>
