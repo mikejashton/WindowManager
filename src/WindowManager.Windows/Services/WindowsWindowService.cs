@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using WindowManager.Abstractions.Models;
 using WindowManager.Abstractions.Services;
@@ -97,5 +98,150 @@ namespace WindowManager.Windows.Services
 
         /// <inheritdoc/>
         public bool IsWindowValid(ManagedWindow window) => NativeMethods.IsWindow(window.Handle);
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Uses <c>PrintWindow</c> with <c>PW_RENDERFULLCONTENT</c> so that the content of
+        /// DWM-composited, DirectX, and UWP windows is captured correctly even when the window
+        /// is partially off-screen or occluded. The result is scaled down to a 300-px-wide
+        /// thumbnail and encoded as a 24-bit BMP byte array.
+        /// </remarks>
+        public byte[]? CaptureScreenshot(ManagedWindow window)
+        {
+            var hWnd = window.Handle;
+            if (!NativeMethods.IsWindow(hWnd)) return null;
+            if (!NativeMethods.GetWindowRect(hWnd, out var rect)) return null;
+
+            int srcW = rect.Right  - rect.Left;
+            int srcH = rect.Bottom - rect.Top;
+            if (srcW <= 0 || srcH <= 0) return null;
+
+            // Scale to a thumbnail of at most 300 px wide, preserving aspect ratio.
+            const int MaxThumbWidth = 300;
+            double scale = srcW > MaxThumbWidth ? (double)MaxThumbWidth / srcW : 1.0;
+            int thumbW = Math.Max(1, (int)(srcW * scale));
+            int thumbH = Math.Max(1, (int)(srcH * scale));
+
+            // Obtain the screen DC used as a reference for creating compatible objects.
+            var hdcScreen = NativeMethods.GetDC(IntPtr.Zero);
+            if (hdcScreen == IntPtr.Zero) return null;
+
+            // Source DC: capture the full window via PrintWindow.
+            var hdcSrc  = NativeMethods.CreateCompatibleDC(hdcScreen);
+            var hbmSrc  = NativeMethods.CreateCompatibleBitmap(hdcScreen, srcW, srcH);
+            var oldSrc  = NativeMethods.SelectObject(hdcSrc, hbmSrc);
+
+            // Pre-fill with white so transparent regions appear on a white background.
+            var whiteBrush = NativeMethods.GetStockObject(NativeMethods.WHITE_BRUSH);
+            var fillRect   = new NativeMethods.RECT { Left = 0, Top = 0, Right = srcW, Bottom = srcH };
+            NativeMethods.FillRect(hdcSrc, ref fillRect, whiteBrush);
+
+            bool captured = NativeMethods.PrintWindow(hWnd, hdcSrc, NativeMethods.PW_RENDERFULLCONTENT);
+
+            byte[]? result = null;
+
+            if (captured)
+            {
+                // Thumbnail DC: scale the full capture down.
+                var hdcThumb = NativeMethods.CreateCompatibleDC(hdcScreen);
+                var hbmThumb = NativeMethods.CreateCompatibleBitmap(hdcScreen, thumbW, thumbH);
+                var oldThumb = NativeMethods.SelectObject(hdcThumb, hbmThumb);
+
+                NativeMethods.SetStretchBltMode(hdcThumb, NativeMethods.HALFTONE);
+                NativeMethods.SetBrushOrgEx(hdcThumb, 0, 0, out _);
+                NativeMethods.StretchBlt(
+                    hdcThumb, 0, 0, thumbW, thumbH,
+                    hdcSrc,  0, 0, srcW,   srcH,
+                    NativeMethods.SRCCOPY);
+
+                // Read pixel data as top-down 24-bit BGR DIB.
+                var bmi = new NativeMethods.BITMAPINFOHEADER
+                {
+                    biSize        = Marshal.SizeOf<NativeMethods.BITMAPINFOHEADER>(),
+                    biWidth       = thumbW,
+                    biHeight      = -thumbH, // negative → top-down row order
+                    biPlanes      = 1,
+                    biBitCount    = 24,
+                    biCompression = 0,       // BI_RGB
+                };
+
+                // Row stride for 24-bit DIBs must be a multiple of 4 bytes.
+                int rowStride  = (thumbW * 3 + 3) & ~3;
+                int pixelBytes = rowStride * thumbH;
+                var pixels     = new byte[pixelBytes];
+                NativeMethods.GetDIBits(hdcThumb, hbmThumb, 0, (uint)thumbH, pixels, ref bmi, 0);
+
+                result = EncodeBmp24(thumbW, thumbH, rowStride, pixels);
+
+                NativeMethods.SelectObject(hdcThumb, oldThumb);
+                NativeMethods.DeleteObject(hbmThumb);
+                NativeMethods.DeleteDC(hdcThumb);
+            }
+
+            // Clean up source DC resources.
+            NativeMethods.SelectObject(hdcSrc, oldSrc);
+            NativeMethods.DeleteObject(hbmSrc);
+            NativeMethods.DeleteDC(hdcSrc);
+            NativeMethods.ReleaseDC(IntPtr.Zero, hdcScreen);
+
+            return result;
+        }
+
+        // ── Private helpers ──────────────────────────────────────────────────
+
+        /// <summary>
+        /// Encodes a top-down 24-bit BGR DIB pixel buffer as a BMP file byte array.
+        /// The BITMAPFILEHEADER and BITMAPINFOHEADER are written with <c>BI_RGB</c> compression.
+        /// </summary>
+        private static byte[] EncodeBmp24(int width, int height, int rowStride, byte[] pixels)
+        {
+            const int FileHeaderSize = 14;
+            const int DibHeaderSize  = 40;
+            int pixelDataSize = rowStride * height;
+            int totalSize     = FileHeaderSize + DibHeaderSize + pixelDataSize;
+
+            var result = new byte[totalSize];
+            int i = 0;
+
+            // BITMAPFILEHEADER
+            result[i++] = 0x42; // 'B'
+            result[i++] = 0x4D; // 'M'
+            WriteInt32(result, ref i, totalSize);
+            WriteInt16(result, ref i, 0);                          // bfReserved1
+            WriteInt16(result, ref i, 0);                          // bfReserved2
+            WriteInt32(result, ref i, FileHeaderSize + DibHeaderSize); // bfOffBits
+
+            // BITMAPINFOHEADER
+            WriteInt32(result, ref i, DibHeaderSize);
+            WriteInt32(result, ref i, width);
+            WriteInt32(result, ref i, -height); // negative = top-down
+            WriteInt16(result, ref i, 1);       // biPlanes
+            WriteInt16(result, ref i, 24);      // biBitCount
+            WriteInt32(result, ref i, 0);       // biCompression = BI_RGB
+            WriteInt32(result, ref i, pixelDataSize);
+            WriteInt32(result, ref i, 2835);    // biXPelsPerMeter ≈ 72 dpi
+            WriteInt32(result, ref i, 2835);    // biYPelsPerMeter ≈ 72 dpi
+            WriteInt32(result, ref i, 0);       // biClrUsed
+            WriteInt32(result, ref i, 0);       // biClrImportant
+
+            // Pixel data
+            Array.Copy(pixels, 0, result, i, pixelDataSize);
+
+            return result;
+        }
+
+        private static void WriteInt32(byte[] buf, ref int offset, int value)
+        {
+            buf[offset++] = (byte)(value);
+            buf[offset++] = (byte)(value >> 8);
+            buf[offset++] = (byte)(value >> 16);
+            buf[offset++] = (byte)(value >> 24);
+        }
+
+        private static void WriteInt16(byte[] buf, ref int offset, short value)
+        {
+            buf[offset++] = (byte)(value);
+            buf[offset++] = (byte)(value >> 8);
+        }
     }
 }
